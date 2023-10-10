@@ -8,9 +8,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 from matplotlib.widgets import SpanSelector
 
-
-
-
 def sem_calc(evokedIn):
    """
    Function to calculate the standard error of the mean for each channel taking into account all subjects.
@@ -29,7 +26,7 @@ def sem_calc(evokedIn):
 dir_base = '/Users/bolger/Documents/work/Projects/project_Brain-IHM'
 Groups = ['Human', 'Agent']
 # Define the video-type and the feedback types.
-Conds2plot = ['Congru-Congru', 'Congru-Congru']  # Needs to be the same length as groups.
+Conds2plot = ['InCongru-InCongru', 'InCongru-InCongru']  # Needs to be the same length as groups.
 
 # Initialize the data.
 EvokedAll_cond = []
@@ -138,9 +135,7 @@ for axs, ecurr in zip(axes.ravel(), eindx):
 
 plt.legend()
 
-chnom = []
 curr_ax = []
-axes = []
 def onclick(event):
     if not event.inaxes:
         return
@@ -149,49 +144,43 @@ def onclick(event):
 
 def onselect(xmin, xmax):
 
-    indmin, indmax = np.searchsorted(x, (xmin, xmax))
+    indmin, indmax = np.searchsorted(times, (xmin, xmax))
     indmax = min(len(times) - 1, indmax)
     region_x = times[indmin:indmax]
     region_y1 = y1[indmin:indmax]
     region_y2 = y2[indmin:indmax]
     print(region_x)
-    for ax, span in zip(axes, span_list):
-        if ax != curr_ax[0]:
-            span.set_visible(False)
-    fig.canvas.draw_idle()
 
     chnom = curr_ax[0].get_title()
     print(chnom)
-    fig2, axes = plt.subplots(1, 2)
-
+    fig2, (axs1, axs2) = plt.subplots(1, 2)
+    #
     data1 = np.mean(EvokedAll_cond[:, indmin:indmax, 0], axis=1)
     data2 = np.mean(EvokedAll_cond[:, indmin:indmax, 1], axis=1)
-    im1, cn1 = mne.viz.plot_topomap(data1, EvokedLoad[0].info, vlim=(-1*(pow(10, -6)), 7*(pow(10, -6))), axes=axes1)
-    im2, cn2 = mne.viz.plot_topomap(data2, EvokedLoad[0].info, vlim=(-1 * (pow(10, -6)), 7 * (pow(10, -6))), axes=axes2)
+    im1, cn1 = mne.viz.plot_topomap(data1, EvokedLoad[0].info, vlim=(-3*(pow(10, -6)), 3*(pow(10, -6))), axes=axs1)
+    im2, cn2 = mne.viz.plot_topomap(data2, EvokedLoad[0].info, vlim=(-3* (pow(10, -6)), 3* (pow(10, -6))), axes=axs2)
     tmin = round(times[indmin]*1000, 1)
     tmax = round(times[indmax] * 1000, 1)
-    axes[0].set_title(condnames[0]+' ('+ str(tmin)+'-'+str(tmax)+'ms'+')')
-    axes[1].set_title(condnames[1] + ' (' + str(tmin) + '-' + str(tmax) + 'ms' + ')')
-    cax1 = fig2.colorbar(im1, ax=axes[0])
-    cax2 = fig2.colorbar(im2, ax=axes[1])
+    axs1.set_title(condnames[0]+' ('+ str(tmin)+'-'+str(tmax)+'ms'+')')
+    axs2.set_title(condnames[1] + ' (' + str(tmin) + '-' + str(tmax) + 'ms' + ')')
+    cax1 = fig2.colorbar(im1, ax=axs1)
+    cax2 = fig2.colorbar(im2, ax=axs2)
     cax1.set_label(r"Magnitude ($\mu$V)")
     cax2.set_label(r"Magnitude ($\mu$V)")
     fig2.canvas.draw()
-
 
 span_list = [SpanSelector(
     ax,
     onselect,
     "horizontal",
-    useblit=True,
+    useblit=False,
     props=dict(alpha=0.2, facecolor="tab:blue"),
     interactive=True,
     drag_from_anywhere=True
-) for ax in axes]
+) for ax in axes.ravel()]
 
-fig.canvas.mpl_connect('button_press_event', onclick)
+cid = fig.canvas.mpl_connect('button_press_event', onclick)
 
-plt.show()
 
 
 
