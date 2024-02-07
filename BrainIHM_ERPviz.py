@@ -8,7 +8,15 @@ import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 from matplotlib.widgets import SpanSelector
 import math
+import pandas as pd
 
+def cond_collapse():
+    """
+    Function to collapse the two types of congruent conditions (Cong-Cong, InCong-Cong) for those
+    participants having both congruous conditions.
+    :param
+    :return:
+    """
 def sem_calc(evokedIn):
    """
    Function to calculate the standard error of the mean for each channel taking into account all subjects.
@@ -42,11 +50,35 @@ def gfp_calc(evoked_data, t):
 
     return gfp1, gfp2
 
+def stimLen_Calc(groupnom, condname, slenDir):
+    if condname == 'CongruentAll':
+        condname1 = 'InCongru-InCongru'
+    else:
+        condname1 = condname
+    fnomPart     = groupnom + '-' + condname1 + '-markerchannel.csv'
+    fnomPart_dir = os.path.join(slenDir, fnomPart)
+    print(fnomPart_dir)
+    contentF = pd.read_csv(fnomPart_dir, sep=";", header = None)
+
+    stimDur      = contentF[1] - contentF[0]
+    stimDur_mean = np.mean(stimDur)
+    stimDur_std  = np.std(stimDur)
+    stimDur_stdLow = stimDur_mean - stimDur_std
+    stimDur_stdHigh = stimDur_mean + stimDur_std
+
+    return stimDur_mean, stimDur_stdLow, stimDur_stdHigh
 
 dir_base = '/Users/bolger/Documents/work/Projects/project_Brain-IHM'
-Groups = ['Agent', 'Agent']
+dir_soundLen = '/Users/bolger/matlab/Projects/CREx_EEGPipeline2024/SoundFile_Data/'
+Groups = ['Agent', 'Human']
+
 # Define the video-type and the feedback types.
-Conds2plot = ['InCongru-Congru', 'InCongru-InCongru']  # Needs to be the same length as groups.
+Conds2plot = ['Congru-Congru', 'Congru-Congru']  # Needs to be the same length as groups.
+
+if len(Conds2plot) == 3:
+    print(f'Need to collapse conditions: {Conds2plot[0]} and {Conds2plot[1]}')
+
+
 
 # Initialize the data.
 EvokedAll_cond = []
@@ -57,14 +89,26 @@ condnames = []
 Lims_upper = []
 Lims_lower = []
 channoms = []
+all_meanSDur = []
+all_stdSDur_low = []
+all_stdSDur_high = []
 
 for gcount, gcurr in enumerate(Groups):
     Group_dir = 'Data_' + gcurr
     Group_path = os.path.join(dir_base, Group_dir, 'EpochData')
     GPath_contents = os.listdir(Group_path)
-    datadir_noms = [x for xind, x in enumerate(GPath_contents) if x.startswith('S')] # Extract names of the data folders.
+    datadir_noms = [x for xind, x in enumerate(GPath_contents) if x.startswith('S')]      # Extract names of the data folders.
     condcurr = Conds2plot[gcount]
-    condcurrf = gcurr + '-' + condcurr
+
+    [meanSDur, stdSDur_low, stdSDur_high] = stimLen_Calc(gcurr, condcurr, dir_soundLen)   # Call of function to calculate the average and std stim lengths for current conditions.
+    all_meanSDur.append(meanSDur)
+    all_stdSDur_low.append(stdSDur_low)
+    all_stdSDur_high.append(stdSDur_high)
+
+    if condcurr == 'CongruentAll':
+        condcurrf = 'CongruentAll'
+    else:
+        condcurrf = gcurr + '-' + condcurr
     condnames.append(condcurrf)
     EvokedLoad = {}
     EvokedCSD = {}
@@ -76,11 +120,13 @@ for gcount, gcurr in enumerate(Groups):
         evoked2load = [x1 for x1 in sujcurr_contents if condcurrf in x1]
 
         if len(evoked2load)>0:
-            print(f' Loading the evoked file: {evoked2load[0]}')
-            evoked2load_path = os.path.join(Sujpath_curr, evoked2load[0])
+            Evked_load = [ev_id for ev_id in evoked2load if '-ave' in ev_id]
+            print(f' Loading the evoked file: {Evked_load[0]}')
+            evoked2load_path = os.path.join(Sujpath_curr, Evked_load[0])
             condsplit = condcurr.split('-')
-            cond2load = condsplit[1]
-            EvokedLoad[scount] = mne.read_evokeds(evoked2load_path,condition=cond2load, baseline=None, kind='average')
+            cond2load = condsplit[len(condsplit)-1]
+            E = mne.read_evokeds(evoked2load_path, condition=None, baseline=None, kind='average')
+            EvokedLoad[scount] = E[0]
             EvokedLoad[scount].copy().set_eeg_reference(projection=True).apply_proj()
             EvokedCSD[scount] = mne.preprocessing.compute_current_source_density(EvokedLoad[scount])
             Evoked_data = EvokedLoad[scount].get_data()
@@ -129,6 +175,7 @@ cols = 3
 rows = int(len(roi)/cols)
 fig, axes = plt.subplots(rows, cols, figsize=(30,10))
 counter = 0
+colrs = ['r', 'g']
 
 for axs, ecurr in zip(axes.ravel(), eindx):
 
@@ -144,12 +191,17 @@ for axs, ecurr in zip(axes.ravel(), eindx):
     axs.plot(times, EvokedAll_cond[ecurr, :, 0], 'darkgray', label=condnames[0])
     axs.plot(times, upper1[ecurr, :], 'darkgray')
     axs.plot(times, lower1[ecurr, :], 'darkgray')
-    axs.fill_between(times, lower1[ecurr, :], upper1[ecurr,:], facecolor='silver', alpha=0.75, linewidth=0.75)
+    axs.fill_between(times, lower1[ecurr, :], upper1[ecurr,:], facecolor='silver', alpha=0.75, linewidth=0.75)                                 
+    axs.annotate('', xy=(all_meanSDur[0], -1.5*(pow(10, -6))),  xytext=(0, -1.5*(pow(10, -6))),
+                   arrowprops=dict(facecolor='red', width=2, headwidth=5))
 
     axs.plot(times, EvokedAll_cond[ecurr, :, 1], 'steelblue', label=condnames[1])
     axs.plot(times, upper2[ecurr, :], 'steelblue')
     axs.plot(times, lower2[ecurr, :], 'steelblue')
     axs.fill_between(times, lower2[ecurr, :], upper2[ecurr, :], facecolor='steelblue', alpha=0.75, linewidth=0.5)
+    axs.annotate('', xy=(all_meanSDur[1], -2.5*(pow(10, -6))),  xytext=(0, -2.5*(pow(10, -6))),
+                   arrowprops=dict(facecolor='green', width=2, headwidth=5))
+    
     axs.axvline(x=0, c="black")
     axs.axhline(y=0, c="black")
     axs.set_title(channoms[ecurr])
@@ -159,7 +211,9 @@ for axs, ecurr in zip(axes.ravel(), eindx):
     axs.set_xticks(np.arange(-0.25, 0.85, 0.2))
     axs.tick_params(axis='x', colors='white')
     axs.set_ylabel(r"$\mu$V")
-    axs.legend(loc='upper right', fontsize='x-small', frameon=False)
+
+    if counter == 0:
+        axs.legend(loc='upper right', fontsize='x-small', frameon=False)
 
     if counter >= len(roi)-3:
         axs.tick_params(axis='x', colors='black')
@@ -178,7 +232,9 @@ def onclick(event):
 
 def onselect(xmin, xmax):
 
-    indmin, indmax = np.searchsorted(times, (xmin, xmax))
+    xmin_round = np.rint(xmin*1000)
+    xmax_round = np.rint(xmax*1000)
+    indmin, indmax = np.searchsorted(times*1000, (xmin_round, xmax_round))
     indmax = min(len(times) - 1, indmax)
     region_x = times[indmin:indmax]
     region_y1 = y1[indmin:indmax]
@@ -195,7 +251,7 @@ def onselect(xmin, xmax):
 
 
     # Call of function to calculate the GFP for each signal.
-    GFP1, GFP2 = gfp_calc(EvokedAllCSD_cond, times)
+    GFP1, GFP2 = gfp_calc(EvokedAll_cond, times)
     data1 = np.mean(EvokedAllCSD_cond[:, indmin:indmax, 0], axis=1)
     data2 = np.mean(EvokedAllCSD_cond[:, indmin:indmax, 1], axis=1)
     im1, cn1 = mne.viz.plot_topomap(data1, EvokedCSD[0].info, vlim=(-800*(pow(10, -6)), 800*(pow(10, -6))), axes=Ax1)
