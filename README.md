@@ -1,5 +1,5 @@
 # ProjectBrainIHM_EEG
-A suite of scripts in python and R used to process and analyse the EEG data from the BrainIHM project. 
+A suite of scripts in matlab, python and R used to process and analyse the EEG data from the BrainIHM project. 
 
 Figure 1 presents the pipeline for the automatic detection of the feedback onset times using the photodiode signals and the video annotations carried out in the Elan software ([https://archive.mpi.nl/tla/elan]([https://archive.mpi.nl/tla/elan])).
 
